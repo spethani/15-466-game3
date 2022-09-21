@@ -85,6 +85,7 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 	// game state
 	game_over = false;
 	finished_playing = true;
+	game_start = true;
 }
 
 PlayMode::~PlayMode() {
@@ -209,12 +210,17 @@ void PlayMode::update(float elapsed) {
 
 		// Replay sequence of notes from start
 		index_to_play = 0;
-		finished_playing = false;
+		finished_playing = true;
 		game_over = false;
 	}
 
 	// update sound
-	if ((finished_playing || current_sample->stopped) && index_to_play < target_sequence.size()) {
+	if (finished_playing && index_to_play == 0 && !game_start) {
+		current_sample = Sound::play(*silence);
+		finished_playing = false;
+	}
+	else if ((game_start || current_sample->stopped) && index_to_play < target_sequence.size()) {
+		game_start = false;
 		finished_playing = false;
 		uint8_t cube_played = target_sequence[index_to_play];
 		if (cube_played == 0) {

@@ -47,6 +47,7 @@ struct PlayMode : Mode {
 
 	// game state
 	bool game_over;
+	bool game_start;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;
