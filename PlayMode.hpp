@@ -38,6 +38,7 @@ struct PlayMode : Mode {
 
 	std::vector<uint8_t> target_sequence;
 	std::vector<uint8_t> player_sequence;
+	uint8_t starting_sequence_size = 1;
 
 	//cube sample being played:
 	std::shared_ptr< Sound::PlayingSample > current_sample;

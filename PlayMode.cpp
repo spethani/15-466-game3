@@ -48,6 +48,9 @@ Load< Sound::Sample > sample2(LoadTagDefault, []() -> Sound::Sample const * {
 Load< Sound::Sample > sample3(LoadTagDefault, []() -> Sound::Sample const * {
 	return new Sound::Sample(data_path("audacity_sound3.wav"));
 });
+Load< Sound::Sample > silence(LoadTagDefault, []() -> Sound::Sample const * {
+	return new Sound::Sample(data_path("silence.wav"));
+});
 
 PlayMode::PlayMode() : scene(*hexapod_scene) {
 	//get pointers to cubes for convenience:
@@ -71,17 +74,17 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 	std::random_device rd; // obtain a random number from hardware
 	std::mt19937 gen(rd()); // seed the generator
 	std::uniform_int_distribution<> distr(0, 3); // define the range
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < starting_sequence_size; i++) {
 		uint8_t sample_num = (uint8_t)distr(gen);
 		assert(0 <= sample_num && sample_num <= 3);
 		target_sequence.push_back(sample_num);
 		std::cout << std::to_string(sample_num) << std::endl;
 	}
 	index_to_play = 0;
-	finished_playing = false;
 
 	// game state
 	game_over = false;
+	finished_playing = true;
 }
 
 PlayMode::~PlayMode() {
@@ -128,8 +131,6 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		Sint32 screen_x = evt.button.x;
 		Sint32 screen_y = evt.button.y;
 		handle_click(screen_x, screen_y);
-		
-		
 	} else if (evt.type == SDL_MOUSEMOTION) {
 		if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
 			glm::vec2 motion = glm::vec2(
@@ -200,20 +201,21 @@ void PlayMode::update(float elapsed) {
 			uint8_t random_number = (uint8_t) distribution(generator);
 			std::cout << std::to_string(random_number) << std::endl;
 			target_sequence.push_back(random_number);
-
-			// Clear the player's sequence
-			player_sequence.clear();
-			assert(player_sequence.size() == 0);
-
-			// Replay sequence of notes from start
-			index_to_play = 0;
-			finished_playing = false;
-
 		}
+
+		// Clear the player's sequence
+		player_sequence.clear();
+		assert(player_sequence.size() == 0);
+
+		// Replay sequence of notes from start
+		index_to_play = 0;
+		finished_playing = false;
+		game_over = false;
 	}
 
 	// update sound
-	if (index_to_play == 0 || (current_sample->stopped && index_to_play < target_sequence.size())) {
+	if ((finished_playing || current_sample->stopped) && index_to_play < target_sequence.size()) {
+		finished_playing = false;
 		uint8_t cube_played = target_sequence[index_to_play];
 		if (cube_played == 0) {
 			current_sample = Sound::play(*sample0);
@@ -259,49 +261,26 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	scene.draw(*camera);
 
 	{ //use DrawLines to overlay some text:
-		if (!game_over) {
-			glDisable(GL_DEPTH_TEST);
-			float aspect = float(drawable_size.x) / float(drawable_size.y);
-			DrawLines lines(glm::mat4(
-				1.0f / aspect, 0.0f, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 1.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 1.0f
-			));
+		glDisable(GL_DEPTH_TEST);
+		float aspect = float(drawable_size.x) / float(drawable_size.y);
+		DrawLines lines(glm::mat4(
+			1.0f / aspect, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		));
 
-			constexpr float H = 0.09f;
-			lines.draw_text("Click on the cubes to match the tone sequence.",
-				glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-			float ofs = 2.0f / drawable_size.y;
-			lines.draw_text("Click on the cubes to match the tone sequence.",
-				glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
-		}
-		else {
-			glDisable(GL_DEPTH_TEST);
-			float aspect = float(drawable_size.x) / float(drawable_size.y);
-			DrawLines lines(glm::mat4(
-				1.0f / aspect, 0.0f, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 1.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 1.0f
-			));
-
-			constexpr float H = 0.09f;
-			std::string game_over_message = "Game over. Score: " + std::to_string(target_sequence.size() - 4);
-			lines.draw_text(game_over_message,
-				glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-			float ofs = 2.0f / drawable_size.y;
-			lines.draw_text(game_over_message,
-				glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
-		}
+		constexpr float H = 0.09f;
+		std::string message = "Click on the cubes to match the tone sequence. Score: " + std::to_string(target_sequence.size() - starting_sequence_size);
+		lines.draw_text(message,
+			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		float ofs = 2.0f / drawable_size.y;
+		lines.draw_text(message,
+			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 	}
 	GL_ERRORS();
 }
