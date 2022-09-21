@@ -34,7 +34,7 @@ struct PlayMode : Mode {
 	Scene::Transform *cube2 = nullptr;
 	Scene::Transform *cube3 = nullptr;
 
-	void PlayMode::handle_click(Sint32 x, Sint32 y);
+	void handle_click(Sint32 x, Sint32 y);
 
 	std::vector<uint8_t> target_sequence;
 	std::vector<uint8_t> player_sequence;

@@ -189,7 +189,7 @@ void PlayMode::update(float elapsed) {
 
 	// check the sequence
 	if (player_sequence.size() == target_sequence.size()) {
-		for (int i = 0; i < player_sequence.size(); i++) {
+		for (uint32_t i = 0; i < player_sequence.size(); i++) {
 			if (player_sequence[i] != target_sequence[i]) {
 				game_over = true;
 			}
