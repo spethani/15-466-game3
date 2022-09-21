@@ -28,16 +28,16 @@ struct PlayMode : Mode {
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 
-	//hexapod leg to wobble:
-	Scene::Transform *hip = nullptr;
-	Scene::Transform *upper_leg = nullptr;
-	Scene::Transform *lower_leg = nullptr;
-	glm::quat hip_base_rotation;
-	glm::quat upper_leg_base_rotation;
-	glm::quat lower_leg_base_rotation;
-	float wobble = 0.0f;
+	//cubes:
+	Scene::Transform *cube0 = nullptr;
+	Scene::Transform *cube1 = nullptr;
+	Scene::Transform *cube2 = nullptr;
+	Scene::Transform *cube3 = nullptr;
 
-	glm::vec3 get_leg_tip_position();
+	std::string PlayMode::cube_clicked(Sint32 x, Sint32 y);
+
+	std::vector<uint8_t> target_sequence;
+	std::vector<uint8_t> player_sequence;
 
 	//music coming from the tip of the leg (as a demonstration):
 	std::shared_ptr< Sound::PlayingSample > leg_tip_loop;

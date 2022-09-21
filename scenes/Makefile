@@ -7,7 +7,7 @@ ifeq ($(UNAME_S),Darwin)
 else ifeq ($(UNAME_S),Linux)
 	BLENDER = ../../blender-2.93.4-linux-x64/blender -y
 else
-	BLENDER = blender
+	BLENDER = "C:\Program Files\Blender Foundation\Blender 3.2\blender.exe"
 endif
 
 EXPORT_MESHES=export-meshes.py
@@ -16,12 +16,12 @@ EXPORT_SCENE=export-scene.py
 DIST=../dist
 
 all : \
-	$(DIST)/hexapod.pnct \
-	$(DIST)/hexapod.scene \
+	$(DIST)/game3.pnct \
+	$(DIST)/game3.scene \
 
 
-$(DIST)/hexapod.scene : hexapod.blend $(EXPORT_SCENE)
+$(DIST)/game3.scene : game3.blend $(EXPORT_SCENE)
 	$(BLENDER) --background --python $(EXPORT_SCENE) -- '$<':Main '$@'
 
-$(DIST)/hexapod.pnct : hexapod.blend $(EXPORT_MESHES)
+$(DIST)/game3.pnct : game3.blend $(EXPORT_MESHES)
 	$(BLENDER) --background --python $(EXPORT_MESHES) -- '$<':Main '$@'
