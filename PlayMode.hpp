@@ -34,13 +34,18 @@ struct PlayMode : Mode {
 	Scene::Transform *cube2 = nullptr;
 	Scene::Transform *cube3 = nullptr;
 
-	std::string PlayMode::cube_clicked(Sint32 x, Sint32 y);
+	void PlayMode::handle_click(Sint32 x, Sint32 y);
 
 	std::vector<uint8_t> target_sequence;
 	std::vector<uint8_t> player_sequence;
 
-	//music coming from the tip of the leg (as a demonstration):
-	std::shared_ptr< Sound::PlayingSample > leg_tip_loop;
+	//cube sample being played:
+	std::shared_ptr< Sound::PlayingSample > current_sample;
+	uint8_t index_to_play;
+	bool finished_playing;
+
+	// game state
+	bool game_over;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;

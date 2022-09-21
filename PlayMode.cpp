@@ -36,8 +36,17 @@ Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
 	});
 });
 
-Load< Sound::Sample > dusty_floor_sample(LoadTagDefault, []() -> Sound::Sample const * {
-	return new Sound::Sample(data_path("dusty-floor.opus"));
+Load< Sound::Sample > sample0(LoadTagDefault, []() -> Sound::Sample const * {
+	return new Sound::Sample(data_path("audacity_sound0.wav"));
+});
+Load< Sound::Sample > sample1(LoadTagDefault, []() -> Sound::Sample const * {
+	return new Sound::Sample(data_path("audacity_sound1.wav"));
+});
+Load< Sound::Sample > sample2(LoadTagDefault, []() -> Sound::Sample const * {
+	return new Sound::Sample(data_path("audacity_sound2.wav"));
+});
+Load< Sound::Sample > sample3(LoadTagDefault, []() -> Sound::Sample const * {
+	return new Sound::Sample(data_path("audacity_sound3.wav"));
 });
 
 PlayMode::PlayMode() : scene(*hexapod_scene) {
@@ -57,9 +66,22 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
 	camera = &scene.cameras.front();
 
-	//start music loop playing:
-	// (note: position will be over-ridden in update())
-	//leg_tip_loop = Sound::loop_3D(*dusty_floor_sample, 1.0f, get_leg_tip_position(), 10.0f);
+	//create target sequence
+	// random code taken from https://stackoverflow.com/questions/7560114/random-number-c-in-some-range
+	std::random_device rd; // obtain a random number from hardware
+	std::mt19937 gen(rd()); // seed the generator
+	std::uniform_int_distribution<> distr(0, 3); // define the range
+	for (int i = 0; i < 4; i++) {
+		uint8_t sample_num = (uint8_t)distr(gen);
+		assert(0 <= sample_num && sample_num <= 3);
+		target_sequence.push_back(sample_num);
+		std::cout << std::to_string(sample_num) << std::endl;
+	}
+	index_to_play = 0;
+	finished_playing = false;
+
+	// game state
+	game_over = false;
 }
 
 PlayMode::~PlayMode() {
@@ -105,7 +127,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 	} else if (evt.type == SDL_MOUSEBUTTONDOWN) {
 		Sint32 screen_x = evt.button.x;
 		Sint32 screen_y = evt.button.y;
-		std::cout << cube_clicked(screen_x, screen_y) << std::endl;
+		handle_click(screen_x, screen_y);
+		
+		
 	} else if (evt.type == SDL_MOUSEMOTION) {
 		if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
 			glm::vec2 motion = glm::vec2(
@@ -160,6 +184,57 @@ void PlayMode::update(float elapsed) {
 	right.downs = 0;
 	up.downs = 0;
 	down.downs = 0;
+
+	// check the sequence
+	if (player_sequence.size() == target_sequence.size()) {
+		for (int i = 0; i < player_sequence.size(); i++) {
+			if (player_sequence[i] != target_sequence[i]) {
+				game_over = true;
+			}
+		}
+		if (!game_over) { // All notes played correctly
+			// Add to the sequence
+			static std::random_device random_device;
+			static std::mt19937 generator(random_device()); 
+			static std::uniform_int_distribution<> distribution(0, 3);
+			uint8_t random_number = (uint8_t) distribution(generator);
+			std::cout << std::to_string(random_number) << std::endl;
+			target_sequence.push_back(random_number);
+
+			// Clear the player's sequence
+			player_sequence.clear();
+			assert(player_sequence.size() == 0);
+
+			// Replay sequence of notes from start
+			index_to_play = 0;
+			finished_playing = false;
+
+		}
+	}
+
+	// update sound
+	if (index_to_play == 0 || (current_sample->stopped && index_to_play < target_sequence.size())) {
+		uint8_t cube_played = target_sequence[index_to_play];
+		if (cube_played == 0) {
+			current_sample = Sound::play(*sample0);
+			index_to_play++;
+		}
+		else if (cube_played == 1) {
+			current_sample = Sound::play(*sample1);
+			index_to_play++;
+		}
+		else if (cube_played == 2) {
+			current_sample = Sound::play(*sample2);
+			index_to_play++;
+		}
+		else if (cube_played == 3) {
+			current_sample = Sound::play(*sample3);
+			index_to_play++;
+		}
+	}
+	else if (current_sample->stopped && index_to_play == target_sequence.size()) {
+		finished_playing = true;
+	}
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
@@ -184,41 +259,80 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	scene.draw(*camera);
 
 	{ //use DrawLines to overlay some text:
-		glDisable(GL_DEPTH_TEST);
-		float aspect = float(drawable_size.x) / float(drawable_size.y);
-		DrawLines lines(glm::mat4(
-			1.0f / aspect, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-		));
+		if (!game_over) {
+			glDisable(GL_DEPTH_TEST);
+			float aspect = float(drawable_size.x) / float(drawable_size.y);
+			DrawLines lines(glm::mat4(
+				1.0f / aspect, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f
+			));
 
-		constexpr float H = 0.09f;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
-			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
-			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			constexpr float H = 0.09f;
+			lines.draw_text("Click on the cubes to match the tone sequence.",
+				glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+			float ofs = 2.0f / drawable_size.y;
+			lines.draw_text("Click on the cubes to match the tone sequence.",
+				glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
+		else {
+			glDisable(GL_DEPTH_TEST);
+			float aspect = float(drawable_size.x) / float(drawable_size.y);
+			DrawLines lines(glm::mat4(
+				1.0f / aspect, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f
+			));
+
+			constexpr float H = 0.09f;
+			std::string game_over_message = "Game over. Score: " + std::to_string(target_sequence.size() - 4);
+			lines.draw_text(game_over_message,
+				glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+			float ofs = 2.0f / drawable_size.y;
+			lines.draw_text(game_over_message,
+				glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
 	}
 	GL_ERRORS();
 }
 
-std::string PlayMode::cube_clicked(Sint32 x, Sint32 y) {
+void PlayMode::handle_click(Sint32 x, Sint32 y) {
+	if (!finished_playing) {
+		return;
+	}
+
 	if (355 <= x && x <= 453 && 81 <= y && y <= 202) {
-		return "Cube.000";
+		// Cube 0
+		current_sample = Sound::play(*sample0);
+		finished_playing = false;
+		player_sequence.push_back(0);
 	}
 	else if (229 <= x && x <= 402 && 434 <= y && y <= 594) {
-		return "Cube.001";
+		// Cube 1
+		current_sample = Sound::play(*sample1);
+		finished_playing = false;
+		player_sequence.push_back(1);
 	}
 	else if (845 <= x && x <= 961 && 434 <= y && y <= 590) {
-		return "Cube.002";
+		// Cube 2
+		current_sample = Sound::play(*sample2);
+		finished_playing = false;
+		player_sequence.push_back(2);
 	}
 	else if (772 <= x && x <= 862 && 81 <= y && y <= 199) {
-		return "Cube.003";
+		// Cube 3
+		current_sample = Sound::play(*sample3);
+		finished_playing = false;
+		player_sequence.push_back(3);
 	}
-	return "";
 }
